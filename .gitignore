@@ -62,3 +62,8 @@ TestTableMap
 # Test Coverage
 *.gcov
 *.gcda
+*.gcno
+*Out.txt
+*.jpg
+quest*.txt
+
