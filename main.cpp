@@ -30,10 +30,15 @@ int main(int argc, char* argv[])
 					executionStatus = EXIT_FAILURE;
 				}
 
+				std::string report(std::to_string(photoFiles.size()) + " photos resized\n");
+
 				if (executionCtrl.enableExecutionTime)
 				{
-					stopWatch.stopTimerAndReport(
-						" processing and reporting input files ");
+					stopWatch.stopTimerAndReport(report);
+				}
+				else
+				{
+					std::cout << report;
 				}
 			}			
 		}
