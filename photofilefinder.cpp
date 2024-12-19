@@ -119,6 +119,17 @@ static std::string makeOutputFileName(
     fsys::path targetFile = targetDir;
     targetFile.append(outputFileName);
 
+    if (fsys::exists(targetFile))
+    {
+        std::cerr << "Do you want to replace the photo: " << targetFile.string() << "?\n(y | n)>>\n";
+        std::string response;
+        std::cin >> response;
+        if (response == "n")
+        {
+            targetFile.clear();
+        }
+    }
+
     return targetFile.string();
 }
 
@@ -134,7 +145,22 @@ static void copyInFilesToPhotoListAddOutFileSpec(
         PhotoFile currentPhoto;
         currentPhoto.inputName = file;
         currentPhoto.outputName = makeOutputFileName(file, targetDir, ctrlValues);
-        photoFileList.push_back(currentPhoto);
+        if (currentPhoto.outputName.empty())
+        {
+            // If there was a replacement that the user replied no to, do they want to quit?
+            std::cerr << "Do you want to quit?(y / n)\n";
+            std::string response;
+            std::cin >> response;
+            if (response == "y")
+            {
+                photoFileList.clear();
+                return;
+            }
+        }
+        else
+        {
+            photoFileList.push_back(currentPhoto);
+        }
     }
 }
 
