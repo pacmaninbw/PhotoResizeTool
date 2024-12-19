@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(PhotoResizeTool LANGUAGES CXX)
+project(ReduceAllPhotos LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,11 +22,11 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
 endif()
 
 
-add_executable(PhotoResizeTool
+add_executable(ReduceAllPhotos
     main.cpp
     CommandLineParser.cpp
     photofilefinder.cpp
     PhotoResizer.cpp
 )
 
-target_link_libraries(PhotoResizeTool  ${OpenCV_LIBS} ${Boost_LIBRARIES})
+target_link_libraries(ReduceAllPhotos  ${OpenCV_LIBS} ${Boost_LIBRARIES})
