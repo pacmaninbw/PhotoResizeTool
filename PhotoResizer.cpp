@@ -3,7 +3,7 @@
 #include "PhotoFileList.h"
 #include "PhotoResizer.h"
 
-static cv::Mat resizePhoto(cv::Mat image, std::size_t newWdith, std::size_t newHeight)
+static cv::Mat resizePhoto(cv::Mat& image, std::size_t newWdith, std::size_t newHeight)
 {
     cv::Size newSize(newWdith, newHeight);
 
@@ -11,10 +11,13 @@ static cv::Mat resizePhoto(cv::Mat image, std::size_t newWdith, std::size_t newH
 
     cv::resize(image, resizedImage, newSize);
 
+    // Prevent memory leak
+    image.release();
+
     return resizedImage;
 }
 
-static cv::Mat resizePhotoByWidthMaintainGeometry(cv::Mat image, std::size_t maxWdith)
+static cv::Mat resizePhotoByWidthMaintainGeometry(cv::Mat& image, std::size_t maxWdith)
 {
     if (static_cast<std::size_t>(image.cols)  <= maxWdith)
     {
@@ -27,7 +30,7 @@ static cv::Mat resizePhotoByWidthMaintainGeometry(cv::Mat image, std::size_t max
     return resizePhoto(image, maxWdith, newHeight);
 }
 
-static cv::Mat resizePhotoByHeightMaintainGeometry(cv::Mat image, std::size_t maxHeight)
+static cv::Mat resizePhotoByHeightMaintainGeometry(cv::Mat& image, std::size_t maxHeight)
 {
     if (static_cast<std::size_t>(image.rows)  <= maxHeight)
     {
@@ -40,7 +43,7 @@ static cv::Mat resizePhotoByHeightMaintainGeometry(cv::Mat image, std::size_t ma
     return resizePhoto(image, newWidth, maxHeight);
 }
 
-static cv::Mat resizePhotoByPercentage(cv::Mat image, unsigned int percentage)
+static cv::Mat resizePhotoByPercentage(cv::Mat& image, unsigned int percentage)
 {
     double percentMult = static_cast<double>(percentage)/100.0;
 
@@ -51,7 +54,7 @@ static cv::Mat resizePhotoByPercentage(cv::Mat image, unsigned int percentage)
     return resizePhoto(image, newWidth, newHeight);
 }
 
-static bool saveResizedPhoto(cv::Mat resizedPhoto, std::string webSafeName)
+static bool saveResizedPhoto(cv::Mat& resizedPhoto, std::string webSafeName)
 {
 
     bool saved = cv::imwrite(webSafeName, resizedPhoto);
@@ -60,10 +63,13 @@ static bool saveResizedPhoto(cv::Mat resizedPhoto, std::string webSafeName)
         std::cerr << "Could not write image " << webSafeName << " to file!\n";
     }
 
+    // Prevent memory leak.
+    resizedPhoto.release();
+
     return saved;
 }
 
-static cv::Mat resizeByUserSpecification(cv::Mat image, PhotCtrlValues ctrlValues)
+static cv::Mat resizeByUserSpecification(cv::Mat& image, PhotCtrlValues ctrlValues)
 {
     if (ctrlValues.maxWdith > 0 && ctrlValues.maxHeight > 0)
     {
