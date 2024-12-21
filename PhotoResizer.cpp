@@ -48,8 +48,8 @@ static cv::Mat resizePhotoByPercentage(cv::Mat& image, unsigned int percentage)
     double percentMult = static_cast<double>(percentage)/100.0;
 
 // Retain the current photo geometry.
-    std::size_t newWidth = static_cast<int>(image.rows * percentMult);
-    std::size_t newHeight = static_cast<int>(image.cols * percentMult);
+    std::size_t newWidth = static_cast<int>(image.cols * percentMult);
+    std::size_t newHeight = static_cast<int>(image.rows * percentMult);
 
     return resizePhoto(image, newWidth, newHeight);
 }
