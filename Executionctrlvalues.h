@@ -1,5 +1,5 @@
-#ifndef EXECUTION_CONTROL_VARIABLES_H
-#define EXECUTION_CONTROL_VARIABLES_H
+#ifndef EXECUTION_CONTROL_VARIABLES_H_
+#define EXECUTION_CONTROL_VARIABLES_H_
 
 /*
  * Storage for environment and commandline argument variables. These structures
@@ -20,4 +20,4 @@ struct ExecutionCtrlValues
     PhotCtrlValues pCtrlV;
 };
 
-#endif // EXECUTION_CONTROL_VARIABLES_H
+#endif // EXECUTION_CONTROL_VARIABLES_H_

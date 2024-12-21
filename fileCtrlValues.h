@@ -1,5 +1,5 @@
-#ifndef FILE_CONTROL_VARIABLES_H
-#define FILE_CONTROL_VARIABLES_H
+#ifndef FILE_CONTROL_VARIABLES_H_
+#define FILE_CONTROL_VARIABLES_H_
 
 #include <string>
 
@@ -14,4 +14,4 @@ struct FileCtrlValues
     std::string resizedPostfix;
 };
 
-#endif // FILE_CONTROL_VARIABLES_H
+#endif // FILE_CONTROL_VARIABLES_H_

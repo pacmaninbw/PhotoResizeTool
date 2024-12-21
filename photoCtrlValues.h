@@ -1,5 +1,5 @@
-#ifndef PHOTO_CONTROL_VARIABLES_H
-#define PHOTO_CONTROL_VARIABLES_H
+#ifndef PHOTO_CONTROL_VARIABLES_H_
+#define PHOTO_CONTROL_VARIABLES_H_
 
 #include <string>
 
@@ -14,4 +14,4 @@ struct PhotCtrlValues
     unsigned int reductionToPercentage = 0;
 };
 
-#endif // PHOTO_CONTROL_VARIABLES_H
+#endif // PHOTO_CONTROL_VARIABLES_H_

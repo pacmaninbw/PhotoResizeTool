@@ -1,9 +1,9 @@
-#ifndef PHOTORESIZER_H
-#define PHOTORESIZER_H
+#ifndef PHOTORESIZER_H_
+#define PHOTORESIZER_H_
 
 #include "photoCtrlValues.h"
 #include "PhotoFileList.h"
 
 std::size_t resizeAllPhotosInList(PhotCtrlValues& ctrlValues, PhotoFileList& photoList);
 
-#endif
+#endif // PHOTORESIZER_H_
