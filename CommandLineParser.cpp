@@ -1,10 +1,10 @@
 #include <boost/program_options.hpp>
 #include "CommandLineParser.h"
-#include "Executionctrlvalues.h"
+#include "ProgramOptions.h"
+#include <expected>
 #include <filesystem>
 #include <iostream>
 #include <string>
-#include <string_view>
 #include <vector>
 
 static std::string simplify_name(char *path)
@@ -13,6 +13,15 @@ static std::string simplify_name(char *path)
 }
 
 namespace po = boost::program_options;
+
+enum class PhotoOptionError
+{
+	no_error,
+	maintain_ratio_both_specified,
+	maintain_ration_no_size,
+	too_many_sizes,
+	no_size
+};
 
 static po::options_description addOptions()
 {
@@ -27,9 +36,8 @@ static po::options_description addOptions()
 		("save-dir", po::value<std::string>(), "Where to save the resized photos")
 		("extend-filename", po::value<std::string>(), "Add the specified string to the resized photo")
 		("web-safe-name", "Change all non alpha numeric characters in filename to underscore")
-		("only-jpg", "Only process the JPEG format photos (default)")
-		("only-png", "Only process the PNG format photos")
-		("jpg-and-png", "Process both the JPEG and PNG format photos")
+		("all-jpg-files", "Process all the JPEG format photos")
+		("all-png-files", "Process all the PNG format photos")
 		("display-resized", "Show the resized photo")
 		("time-resize", "Time the resizing of the photos")
 	;
@@ -37,141 +45,90 @@ static po::options_description addOptions()
 	return options;
 }
 
-static bool fileExtensionErrorCheck(po::variables_map& inputOptions)
+
+static FileOptions inputToFileOptions(po::variables_map& inputOptions)
 {
-	bool noUserError = true;
+	FileOptions fileOptions;
 
-	if (inputOptions.count("only-jpg") && (inputOptions.count("jpg-and-png") || inputOptions.count("only-png")))
+	if (inputOptions.count("all-jpg-files")) 
 	{
-		noUserError = false;
+		fileOptions.processJPGFiles = true;
 	}
 
-	if (inputOptions.count("jpg-and-png") && (inputOptions.count("only-jpg") || inputOptions.count("only-png")))
-	{
-		noUserError = false;
+	if (inputOptions.count("all-png-files")) {
+		fileOptions.processPNGFiles = true;
 	}
-
-	if (inputOptions.count("only-png") && (inputOptions.count("only-jpg") || inputOptions.count("jpg-and-png")))
-	{
-		noUserError = false;
-	}
-
-	if (!noUserError)
-	{
-		std::cerr << "use only one of --only-jpg, --only-png or --jpg-and-png.\n";
-	}
-
-	return noUserError;
-}
-
-static void setExtensionValues(po::variables_map& inputOptions, FileCtrlValues& fileCtrl)
-{
-	// Provide a default of JPG files.
-	if (inputOptions.count("only-jpg") ||
-		(!inputOptions.count("only-jpg") && !inputOptions.count("only-png") &&
-		!inputOptions.count("jpg-and-png"))) {
-		fileCtrl.processJPGFiles = true;
-		fileCtrl.processPNGFiles = false;
-	}
-
-	if (inputOptions.count("only-png")) {
-		fileCtrl.processJPGFiles = false;
-		fileCtrl.processPNGFiles = true;
-	}
-
-	if (inputOptions.count("jpg-and-png")) {
-		fileCtrl.processJPGFiles = true;
-		fileCtrl.processPNGFiles = true;
-	}
-}
-
-static bool convertInputToFileCtrlValues(po::variables_map& inputOptions, FileCtrlValues& fileCtrl)
-{
-	if (!fileExtensionErrorCheck(inputOptions))
-	{
-		return false;
-	}
-
-	setExtensionValues(inputOptions, fileCtrl);
 
 	if (inputOptions.count("save-dir")) {
-		fileCtrl.imageTargetDirectory = inputOptions["save-dir"].as<std::string>();
+		fileOptions.targetDirectory = inputOptions["save-dir"].as<std::string>();
 	}
 
 	if (inputOptions.count("source-dir")) {
-		fileCtrl.sourceDirectory = inputOptions["source-dir"].as<std::string>();
+		fileOptions.sourceDirectory = inputOptions["source-dir"].as<std::string>();
 	}
 
 	if (inputOptions.count("extend-filename")) {
-		fileCtrl.resizedPostfix = inputOptions["extend-filename"].as<std::string>();
+		fileOptions.resizedPostfix = inputOptions["extend-filename"].as<std::string>();
 	}
 
 	if (inputOptions.count("web-safe-name")) {
-		fileCtrl.fixFileName = true;
+		fileOptions.fixFileName = true;
 	}
 
-	return true;
+	return fileOptions;
 }
 
-static bool maintainRatioCheck(po::variables_map& inputOptions, PhotCtrlValues& photoCtrl)
+static PhotoOptionError maintainRatioCheck(po::variables_map& inputOptions)
 {
+	if (inputOptions.count("max-height") && inputOptions.count("max-width"))
+	{
+		std::cerr << "Only one of --max-width or --max-height can be specified with maintain-ratio\n";
+		return PhotoOptionError::maintain_ratio_both_specified;
+	}
+
+	if (!inputOptions.count("max-height") && !inputOptions.count("max-width"))
+	{
+		std::cerr << "A maximum size, either width or height must be specified with maintain-ratio\n";
+		return PhotoOptionError::maintain_ration_no_size;
+	}
+
+	return PhotoOptionError::no_error;
+}
+
+static bool hasSize(po::variables_map& inputOptions)
+{
+	return inputOptions.count("max-height") || inputOptions.count("max-width") ||
+		inputOptions.count("percentage");
+}
+
+static auto inputToPhotoOptions(po::variables_map& inputOptions) -> std::expected<PhotoOptions, PhotoOptionError>
+{
+	PhotoOptions photoCtrl;
+	
 	if (inputOptions.count("maintain-ratio")) {
-		if (inputOptions.count("max-height") && inputOptions.count("max-width"))
+		PhotoOptionError ratioCheck = maintainRatioCheck(inputOptions);
+		if (ratioCheck != PhotoOptionError::no_error)
 		{
-			std::cerr << "Only one of --max-width or --max-height can be specified with maintain-ratio\n";
-			return false;
+			return std::unexpected(ratioCheck);
 		}
-
-		if (!inputOptions.count("max-height") && !inputOptions.count("max-width"))
-		{
-			std::cerr << "A maximum size, either width or height must be specified with maintain-ratio\n";
-			return false;
-		}
-
 		photoCtrl.maintainRatio = true;
 	}
 
-	return true;
-}
-
-static bool photoSizeRequirements(po::variables_map& inputOptions, PhotCtrlValues& photoCtrl)
-{
-	if (!maintainRatioCheck(inputOptions, photoCtrl))
+	if (hasSize(inputOptions))
 	{
-		return false;
-	}
+		photoCtrl.maxWdith = (inputOptions.count("max-width")) ?
+			inputOptions["max-width"].as<std::size_t>() : 0;
 
-	if (!inputOptions.count("max-height") && !inputOptions.count("max-width") &&
-		!inputOptions.count("percentage"))
+		photoCtrl.maxHeight = (inputOptions.count("max-height")) ?
+			inputOptions["max-height"].as<std::size_t>() : 0;
+
+		photoCtrl.reductionToPercentage = (inputOptions.count("percentage")) ?
+			inputOptions["percentage"].as<unsigned int>() : 0;
+	}
+	else
 	{
 		std::cerr << "A new size must be specified using --percentage, --max-width or --max-height\n";
-		return false;
-	}
-
-	if (inputOptions.count("max-width"))
-	{
-		photoCtrl.maxWdith = inputOptions["max-width"].as<std::size_t>();
-	}
-
-	if (inputOptions.count("max-height"))
-	{
-		photoCtrl.maxHeight = inputOptions["max-height"].as<std::size_t>();
-	}
-
-	if (inputOptions.count("percentage"))
-	{
-		photoCtrl.reductionToPercentage = inputOptions["percentage"].as<unsigned int>();
-	}
-
-	return true;
-}
-
-static bool convertInputToPhotoCtrlValues(po::variables_map& inputOptions, PhotCtrlValues& photoCtrl)
-{
-
-	if (!photoSizeRequirements(inputOptions, photoCtrl))
-	{
-		return false;
+		return std::unexpected(PhotoOptionError::no_size);
 	}
 
 	if (inputOptions.count("display-resized"))
@@ -179,20 +136,21 @@ static bool convertInputToPhotoCtrlValues(po::variables_map& inputOptions, PhotC
 		photoCtrl.displayImage = true;
 	}
 
-	return true;
+	return photoCtrl;
 }
 
-static bool covertInputToExecutable(po::variables_map& inputOptions, ExecutionCtrlValues& executionCtrl)
+static bool InputToOptions(po::variables_map& inputOptions, ProgramOptions& executionCtrl)
 {
-	if (!convertInputToPhotoCtrlValues(inputOptions, executionCtrl.pCtrlV))
+	if (const auto pOptions = inputToPhotoOptions(inputOptions); pOptions.has_value())
+	{
+		executionCtrl.photoOptions = *pOptions;
+	}
+	else
 	{
 		return false;
 	}
 
-	if (!convertInputToFileCtrlValues(inputOptions, executionCtrl.fCtrlV))
-	{
-		return false;
-	}
+	executionCtrl.fileOptions = inputToFileOptions(inputOptions);
 
 	if (inputOptions.count("time-resize")) {
 		executionCtrl.enableExecutionTime = true;
@@ -204,12 +162,12 @@ static bool covertInputToExecutable(po::variables_map& inputOptions, ExecutionCt
 static const int MinArgCount = 2;
 static std::string usageStr =
 	" :\n\tReduce the size of all the photos in the specified folder.\n"
-	"\tIf no source location is specifed the photos must be in the current folder.\n"
-	"\tA reduction size value must be specified, either by maximum width, maixmum\n"
+	"\tIf no source location is specified the photos must be in the current folder.\n"
+	"\tA reduction size value must be specified, either by maximum width, maximum\n"
 	"\theight or a percentage of the current size.\n"
 ;
 
-bool processCommandLine(int argc, char* argv[], ExecutionCtrlValues& executionCtrl)
+bool processCommandLine(int argc, char* argv[], ProgramOptions& executionCtrl)
 {
 	executionCtrl.progName = simplify_name(argv[0]);
 
@@ -231,7 +189,7 @@ bool processCommandLine(int argc, char* argv[], ExecutionCtrlValues& executionCt
 		return false;
 	}
 
-	if (!covertInputToExecutable(optionMemory, executionCtrl))
+	if (!InputToOptions(optionMemory, executionCtrl))
 	{
 		std::cout << executionCtrl.progName << usageStr << "\n";
 		std::cout << options << "\n";

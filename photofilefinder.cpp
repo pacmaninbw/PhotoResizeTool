@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <cctype>
-#include "fileCtrlValues.h"
+#include "fileOptions.h"
 #include <filesystem>
 #include <iostream>
 #include <iterator>
@@ -12,21 +12,23 @@
 #include <vector>
 
 // std::filesystem can make lines very long.
-namespace fsys = std::filesystem;
+namespace fs = std::filesystem;
 
-using DirectoryMap = std::unordered_map<std::string, fsys::path>;
+using DirectoryMap = std::unordered_map<std::string, fs::path>;
 
-static void findDirectory(std::string target, std::string errString, 
-     fsys::path defaultDir, std::string dirIndex, DirectoryMap& dirMap
+using InputPhotoList = std::vector<fs::path>;
+
+static void findDirectory(std::string& target, const std::string& errString, 
+     fs::path& defaultDir, const std::string& dirIndex, DirectoryMap& dirMap
 )
 {
-    fsys::path foundDir  = defaultDir;
+    fs::path foundDir  = defaultDir;
 
     if (!target.empty())
     {
-        foundDir = fsys::current_path();
+        foundDir = fs::current_path();
         foundDir.append(target);
-        if (!fsys::exists(foundDir))
+        if (!fs::exists(foundDir))
         {
             std::cerr << "The " << errString << " directory " << target << 
                 " can't be found!\n";
@@ -37,45 +39,45 @@ static void findDirectory(std::string target, std::string errString,
     dirMap.insert({dirIndex, foundDir});
 }
 
-static DirectoryMap findAllDirectories(FileCtrlValues& ctrlValues)
+static DirectoryMap findAllDirectories(FileOptions& fileOptions)
 {
     DirectoryMap dirMap;
+    fs::path defaultDir = fs::current_path();
+    
+    findDirectory(fileOptions.sourceDirectory, "photo source", defaultDir, "SourceDir", dirMap);
+    defaultDir = dirMap.find("SourceDir")->second;
 
-    findDirectory(ctrlValues.sourceDirectory, "photo source", fsys::current_path(), "SourceDir", dirMap);
-    fsys::path defaultDir = dirMap.find("SourceDir")->second;
-
-    findDirectory(ctrlValues.imageTargetDirectory, "photo target", defaultDir, "TargetDir", dirMap);
-    findDirectory(ctrlValues.imageProcessedDirectory, "photo target", defaultDir, "RelocDir", dirMap);
+    findDirectory(fileOptions.targetDirectory, "photo target", defaultDir, "TargetDir", dirMap);
+    findDirectory(fileOptions.relocDirectory, "photo target", defaultDir, "RelocDir", dirMap);
 
     return dirMap;
 }
 
-static void addFilesToListByExtension(std::filesystem::path cwd, std::string extLC, 
-        std::string extUC, std::vector<std::string>& photoList)
+static void addFilesToListByExtension(std::filesystem::path& cwd, const std::string& extLC, 
+        const std::string& extUC, InputPhotoList& photoList)
 {
     auto is_match = [extLC, extUC](auto f) {
         return f.path().extension().string() == extLC ||
             f.path().extension().string() == extUC;
     };
 
-    auto files = fsys::directory_iterator{ cwd }
+    auto files = fs::directory_iterator{ cwd }
         | std::views::filter([](auto& f) { return f.is_regular_file(); })
-        | std::views::filter(is_match)
-        | std::views::transform([](auto& f) { return f.path().string(); });
+        | std::views::filter(is_match);
 
     std::ranges::copy(files, std::back_inserter(photoList));
 }
 
-static std::vector<std::string> findAllPhotos(fsys::path originsDir, FileCtrlValues& ctrlValues)
+static InputPhotoList findAllPhotos(fs::path& originsDir, FileOptions& fileOptions)
 {
-    std::vector<std::string> tempFileList;
+    InputPhotoList tempFileList;
 
-    if (ctrlValues.processJPGFiles)
+    if (fileOptions.processJPGFiles)
     {
         addFilesToListByExtension(originsDir, ".jpg", ".JPG", tempFileList);
     }
 
-    if (ctrlValues.processPNGFiles)
+    if (fileOptions.processPNGFiles)
     {
         addFilesToListByExtension(originsDir, ".png", ".PNG", tempFileList);
     }
@@ -83,7 +85,7 @@ static std::vector<std::string> findAllPhotos(fsys::path originsDir, FileCtrlVal
     return tempFileList;
 }
 
-static std::string changeNonAlphaNumCharsToUnderscore(std::string inName)
+static std::string changeNonAlphaNumCharsToUnderscore(const std::string& inName)
 {
     std::string webSafeName;
 
@@ -95,31 +97,30 @@ static std::string changeNonAlphaNumCharsToUnderscore(std::string inName)
 }
 
 static std::string makeOutputFileName(
-    std::string inputFileName,
-    fsys::path targetDir,
-    FileCtrlValues& ctrlValues
+    const fs::path& inputFile,
+    const fs::path& targetDir,
+    FileOptions& fileOptions
 )
 {
-    fsys::path outNameBasis = inputFileName;
-    std::string ext = outNameBasis.extension().string();
-    std::string outputFileName = outNameBasis.stem().string();
+    std::string ext = inputFile.extension().string();
+    std::string outputFileName = inputFile.stem().string();
 
-    if (ctrlValues.fixFileName)
+    if (fileOptions.fixFileName)
     {
         outputFileName = changeNonAlphaNumCharsToUnderscore(outputFileName);
     }
 
-    if (!ctrlValues.resizedPostfix.empty())
+    if (!fileOptions.resizedPostfix.empty())
     {
-        outputFileName += "." + ctrlValues.resizedPostfix;
+        outputFileName += "." + fileOptions.resizedPostfix;
     }
 
     outputFileName += ext;
 
-    fsys::path targetFile = targetDir;
+    fs::path targetFile = targetDir;
     targetFile.append(outputFileName);
 
-    if (fsys::exists(targetFile))
+    if (fs::exists(targetFile))
     {
         std::cerr << "Do you want to replace the photo: " << targetFile.string() << "?\n(y | n)>>\n";
         std::string response;
@@ -133,18 +134,19 @@ static std::string makeOutputFileName(
     return targetFile.string();
 }
 
-static void copyInFilesToPhotoListAddOutFileSpec(
-    FileCtrlValues& ctrlValues,
-    std::vector<std::string>& inFileList,
-    PhotoFileList& photoFileList,
-    fsys::path targetDir
+static PhotoFileList copyInFilesToPhotoListAddOutFileSpec(
+    FileOptions& fileOptions,
+    InputPhotoList& inFileList,
+    fs::path& targetDir
 )
 {
-    for (auto file: inFileList)
+    PhotoFileList photoFileList;
+
+    for (auto const& file: inFileList)
     {
         PhotoFile currentPhoto;
-        currentPhoto.inputName = file;
-        currentPhoto.outputName = makeOutputFileName(file, targetDir, ctrlValues);
+        currentPhoto.inputName = file.string();
+        currentPhoto.outputName = makeOutputFileName(file, targetDir, fileOptions);
         if (currentPhoto.outputName.empty())
         {
             // If there was a replacement that the user replied no to, do they want to quit?
@@ -154,7 +156,7 @@ static void copyInFilesToPhotoListAddOutFileSpec(
             if (response == "y")
             {
                 photoFileList.clear();
-                return;
+                return photoFileList;
             }
         }
         else
@@ -162,12 +164,14 @@ static void copyInFilesToPhotoListAddOutFileSpec(
             photoFileList.push_back(currentPhoto);
         }
     }
+
+    return photoFileList;
 }
 
-PhotoFileList buildPhotoInputAndOutputList(FileCtrlValues& ctrlValues)
+PhotoFileList buildPhotoInputAndOutputList(FileOptions& fileOptions)
 {
     PhotoFileList photoFileList;
-    DirectoryMap directories = findAllDirectories(ctrlValues);
+    DirectoryMap directories = findAllDirectories(fileOptions);
 
     for (auto& directory: directories)
     {
@@ -177,14 +181,15 @@ PhotoFileList buildPhotoInputAndOutputList(FileCtrlValues& ctrlValues)
         }
     }
 
-    fsys::path sourceDir = directories.find("SourceDir")->second;;
+    fs::path sourceDir = directories.find("SourceDir")->second;;
 
-    std::vector<std::string> inputPhotoList = findAllPhotos(sourceDir, ctrlValues);
+    InputPhotoList inputPhotoList = findAllPhotos(sourceDir, fileOptions);
     
     if (inputPhotoList.size())
     {
-        fsys::path targetDir = directories.find("TargetDir")->second;
-        copyInFilesToPhotoListAddOutFileSpec(ctrlValues, inputPhotoList, photoFileList, targetDir);
+        fs::path targetDir = directories.find("TargetDir")->second;
+        photoFileList = copyInFilesToPhotoListAddOutFileSpec(
+            fileOptions, inputPhotoList, targetDir);
     }
     else
     {

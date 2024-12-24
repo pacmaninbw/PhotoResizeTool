@@ -1,66 +1,66 @@
 #include <opencv2/opencv.hpp>
-#include "photoCtrlValues.h"
+#include "PhotoOptions.h"
 #include "PhotoFileList.h"
 #include "PhotoResizer.h"
 
-static cv::Mat resizePhoto(cv::Mat& image, std::size_t newWdith, std::size_t newHeight)
+static cv::Mat resizePhoto(cv::Mat& photo, const std::size_t newWdith, const std::size_t newHeight)
 {
     cv::Size newSize(newWdith, newHeight);
 
-    cv::Mat resizedImage;
+    cv::Mat resizedPhoto;
 
-    cv::resize(image, resizedImage, newSize);
+    cv::resize(photo, resizedPhoto, newSize, 0, 0, cv::INTER_AREA);
 
     // Prevent memory leak
-    image.release();
+    photo.release();
 
-    return resizedImage;
+    return resizedPhoto;
 }
 
-static cv::Mat resizePhotoByWidthMaintainGeometry(cv::Mat& image, std::size_t maxWdith)
+static cv::Mat resizePhotoByWidthMaintainGeometry(cv::Mat& photo, const std::size_t maxWdith)
 {
-    if (static_cast<std::size_t>(image.cols)  <= maxWdith)
+    if (static_cast<std::size_t>(photo.cols)  <= maxWdith)
     {
-        return image;
+        return photo;
     }
 
-    double ratio = static_cast<double>(maxWdith) / static_cast<double>(image.cols);
-    std::size_t newHeight = static_cast<int>(image.rows * ratio);
+    double ratio = static_cast<double>(maxWdith) / static_cast<double>(photo.cols);
+    std::size_t newHeight = static_cast<int>(photo.rows * ratio);
 
-    return resizePhoto(image, maxWdith, newHeight);
+    return resizePhoto(photo, maxWdith, newHeight);
 }
 
-static cv::Mat resizePhotoByHeightMaintainGeometry(cv::Mat& image, std::size_t maxHeight)
+static cv::Mat resizePhotoByHeightMaintainGeometry(cv::Mat& photo, const std::size_t maxHeight)
 {
-    if (static_cast<std::size_t>(image.rows)  <= maxHeight)
+    if (static_cast<std::size_t>(photo.rows)  <= maxHeight)
     {
-        return image;
+        return photo;
     }
 
-    double ratio = static_cast<double>(maxHeight) / static_cast<double>(image.rows);
-    std::size_t newWidth = static_cast<int>(image.cols * ratio);
+    double ratio = static_cast<double>(maxHeight) / static_cast<double>(photo.rows);
+    std::size_t newWidth = static_cast<int>(photo.cols * ratio);
 
-    return resizePhoto(image, newWidth, maxHeight);
+    return resizePhoto(photo, newWidth, maxHeight);
 }
 
-static cv::Mat resizePhotoByPercentage(cv::Mat& image, unsigned int percentage)
+static cv::Mat resizePhotoByPercentage(cv::Mat& photo, const unsigned int percentage)
 {
     double percentMult = static_cast<double>(percentage)/100.0;
 
 // Retain the current photo geometry.
-    std::size_t newWidth = static_cast<int>(image.cols * percentMult);
-    std::size_t newHeight = static_cast<int>(image.rows * percentMult);
+    std::size_t newWidth = static_cast<int>(photo.cols * percentMult);
+    std::size_t newHeight = static_cast<int>(photo.rows * percentMult);
 
-    return resizePhoto(image, newWidth, newHeight);
+    return resizePhoto(photo, newWidth, newHeight);
 }
 
-static bool saveResizedPhoto(cv::Mat& resizedPhoto, std::string webSafeName)
+static bool saveResizedPhoto(cv::Mat& resizedPhoto, const std::string webSafeName)
 {
 
     bool saved = cv::imwrite(webSafeName, resizedPhoto);
 
     if (!saved) {
-        std::cerr << "Could not write image " << webSafeName << " to file!\n";
+        std::cerr << "Could not write photo " << webSafeName << " to file!\n";
     }
 
     // Prevent memory leak.
@@ -69,73 +69,73 @@ static bool saveResizedPhoto(cv::Mat& resizedPhoto, std::string webSafeName)
     return saved;
 }
 
-static cv::Mat resizeByUserSpecification(cv::Mat& image, PhotCtrlValues ctrlValues)
+static cv::Mat resizeByUserSpecification(cv::Mat& photo, const PhotoOptions& photoOptions)
 {
-    if (ctrlValues.maxWdith > 0 && ctrlValues.maxHeight > 0)
+    if (photoOptions.maxWdith > 0 && photoOptions.maxHeight > 0)
     {
-        return resizePhoto(image, ctrlValues.maxWdith, ctrlValues.maxHeight);
+        return resizePhoto(photo, photoOptions.maxWdith, photoOptions.maxHeight);
     }
 
-    if (ctrlValues.reductionToPercentage > 0)
+    if (photoOptions.reductionToPercentage > 0)
     {
-        return resizePhotoByPercentage(image, ctrlValues.reductionToPercentage);
+        return resizePhotoByPercentage(photo, photoOptions.reductionToPercentage);
     }
 
-    if (ctrlValues.maintainRatio)
+    if (photoOptions.maintainRatio)
     {
-        if (ctrlValues.maxWdith > 0)
+        if (photoOptions.maxWdith > 0)
         {
-            return resizePhotoByWidthMaintainGeometry(image, ctrlValues.maxWdith);
+            return resizePhotoByWidthMaintainGeometry(photo, photoOptions.maxWdith);
         }
-        if (ctrlValues.maxHeight > 0)
+        if (photoOptions.maxHeight > 0)
         {
-            return resizePhotoByHeightMaintainGeometry(image, ctrlValues.maxHeight);
+            return resizePhotoByHeightMaintainGeometry(photo, photoOptions.maxHeight);
         }
         std::cerr << "Neither width nor height were specified with"
             " --maintain-ratio, can't resize photo!\n";
-        return image;
+        return photo;
     }
     else
     {
-        if (ctrlValues.maxWdith > 0 && ctrlValues.maxHeight == 0)
+        if (photoOptions.maxWdith > 0 && photoOptions.maxHeight == 0)
         {
-            return resizePhotoByWidthMaintainGeometry(image, ctrlValues.maxWdith);
+            return resizePhotoByWidthMaintainGeometry(photo, photoOptions.maxWdith);
         }
-        if (ctrlValues.maxHeight > 0 && ctrlValues.maxWdith == 0)
+        if (photoOptions.maxHeight > 0 && photoOptions.maxWdith == 0)
         {
-            return resizePhotoByHeightMaintainGeometry(image, ctrlValues.maxHeight);
+            return resizePhotoByHeightMaintainGeometry(photo, photoOptions.maxHeight);
         }
     }
 
-    return image;
+    return photo;
 }
 
-static bool resizeAndSavePhoto(PhotoFile imageName, PhotCtrlValues ctrlValues)
+static bool resizeAndSavePhoto(PhotoFile photoFile, const PhotoOptions& photoOptions)
 {
-    cv::Mat image = cv::imread(imageName.inputName);
-    if (image.empty()) {
-        std::cerr << "Could not read image " << imageName.inputName << "!\n";
+    cv::Mat photo = cv::imread(photoFile.inputName);
+    if (photo.empty()) {
+        std::cerr << "Could not read photo " << photoFile.inputName << "!\n";
         return false;
     }
 
-    cv::Mat resized = resizeByUserSpecification(image, ctrlValues);
+    cv::Mat resized = resizeByUserSpecification(photo, photoOptions);
 
-    if (ctrlValues.displayImage)
+    if (photoOptions.displayImage)
     {
-        cv::imshow("Resized Image", resized);
+        cv::imshow("Resized Photo", resized);
         cv::waitKey(0);
     }
 
-    return saveResizedPhoto(resized, imageName.outputName);
+    return saveResizedPhoto(resized, photoFile.outputName);
 }
 
-std::size_t resizeAllPhotosInList(PhotCtrlValues& ctrlValues, PhotoFileList& photoList)
+std::size_t resizeAllPhotosInList(const PhotoOptions& photoOptions, const PhotoFileList& photoList)
 {
     std::size_t resizedCount = 0;
 
-    for (auto picture: photoList)
+    for (auto photo: photoList)
     {
-        if (resizeAndSavePhoto(picture, ctrlValues))
+        if (resizeAndSavePhoto(photo, photoOptions))
         {
             ++resizedCount;
         }

@@ -1,9 +1,9 @@
 #ifndef PHOTOFILEFINDER_H_
 #define PHOTOFILEFINDER_H_
 
-#include "fileCtrlValues.h"
+#include "fileOptions.h"
 #include "PhotoFileList.h"
 
-PhotoFileList buildPhotoInputAndOutputList(FileCtrlValues& ctrlValues);
+PhotoFileList buildPhotoInputAndOutputList(FileOptions& fileOptions);
 
 #endif // PHOTOFILEFINDER_H_

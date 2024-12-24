@@ -1,5 +1,5 @@
-#ifndef EXECUTION_CONTROL_VARIABLES_H_
-#define EXECUTION_CONTROL_VARIABLES_H_
+#ifndef PROGRAMOPTIONS_H_
+#define PROGRAMOPTIONS_H_
 
 /*
  * Storage for environment and commandline argument variables. These structures
@@ -8,16 +8,16 @@
  * 
  * The list of photo files is separate.
  */
-#include "fileCtrlValues.h"
-#include "photoCtrlValues.h"
+#include "fileOptions.h"
+#include "PhotoOptions.h"
 #include <string>
 
-struct ExecutionCtrlValues
+struct ProgramOptions
 {
     std::string progName;
 	bool enableExecutionTime = false;
-    FileCtrlValues fCtrlV;
-    PhotCtrlValues pCtrlV;
+    FileOptions fileOptions;
+    PhotoOptions photoOptions;
 };
 
-#endif // EXECUTION_CONTROL_VARIABLES_H_
+#endif // PROGRAMOPTIONS_H_

@@ -1,9 +1,9 @@
-#ifndef PHOTO_CONTROL_VARIABLES_H_
-#define PHOTO_CONTROL_VARIABLES_H_
+#ifndef PHOTO_OPTIONS_H_
+#define PHOTO_OPTIONS_H_
 
 #include <string>
 
-struct PhotCtrlValues
+struct PhotoOptions
 {
 	bool displayImage = false;
     bool maintainRatio = false;
@@ -14,4 +14,4 @@ struct PhotCtrlValues
     unsigned int reductionToPercentage = 0;
 };
 
-#endif // PHOTO_CONTROL_VARIABLES_H_
+#endif // PHOTO_OPTIONS_H_

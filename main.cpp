@@ -1,5 +1,5 @@
 #include "CommandLineParser.h"
-#include "Executionctrlvalues.h"
+#include "ProgramOptions.h"
 #include <iostream>
 #include "PhotoFileList.h"
 #include "photofilefinder.h"
@@ -14,33 +14,33 @@ int main(int argc, char* argv[])
 
 	try
 	{
-		ExecutionCtrlValues executionCtrl;
+		ProgramOptions programOptions;
+		std::size_t resizeCount = 0;
 
-		if (processCommandLine(argc, argv, executionCtrl))
+		if (processCommandLine(argc, argv, programOptions))
 		{
-			PhotoFileList photoFiles = buildPhotoInputAndOutputList(executionCtrl.fCtrlV);
+			PhotoFileList photoFiles = buildPhotoInputAndOutputList(programOptions.fileOptions);
 
-			if (photoFiles.size() > 0)
+			UtilityTimer stopWatch;
+
+			resizeCount = resizeAllPhotosInList(programOptions.photoOptions, photoFiles);
+			if (resizeCount != photoFiles.size())
 			{
-				UtilityTimer stopWatch;
+				std::cerr << "Not all photos were resized\n";
+				executionStatus = EXIT_FAILURE;
+			}
 
-				if (resizeAllPhotosInList(executionCtrl.pCtrlV, photoFiles) != photoFiles.size())
-				{
-					std::cerr << "Not all photos were resized\n";
-					executionStatus = EXIT_FAILURE;
-				}
+			std::string report(std::to_string(resizeCount) + " of " + 
+				std::to_string(photoFiles.size()) + " photos resized\n");
 
-				std::string report(std::to_string(photoFiles.size()) + " photos resized\n");
-
-				if (executionCtrl.enableExecutionTime)
-				{
-					stopWatch.stopTimerAndReport(report);
-				}
-				else
-				{
-					std::cout << report;
-				}
-			}			
+			if (programOptions.enableExecutionTime)
+			{
+				stopWatch.stopTimerAndReport(report);
+			}
+			else
+			{
+				std::cout << report;
+			}
 		}
 	}
 
