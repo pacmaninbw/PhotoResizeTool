@@ -8,7 +8,7 @@
  * 
  * The list of photo files is separate.
  */
-#include "fileOptions.h"
+#include "FileOptions.h"
 #include "PhotoOptions.h"
 #include <string>
 

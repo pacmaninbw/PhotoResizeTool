@@ -1,6 +1,6 @@
 #include <algorithm>
 #include <cctype>
-#include "fileOptions.h"
+#include "FileOptions.h"
 #include <filesystem>
 #include <iostream>
 #include <iterator>
