@@ -139,21 +139,21 @@ static auto inputToPhotoOptions(po::variables_map& inputOptions) -> std::expecte
 	return photoCtrl;
 }
 
-static bool InputToOptions(po::variables_map& inputOptions, ProgramOptions& executionCtrl)
+static bool InputToOptions(po::variables_map& inputOptions, ProgramOptions& programOptions)
 {
 	if (const auto pOptions = inputToPhotoOptions(inputOptions); pOptions.has_value())
 	{
-		executionCtrl.photoOptions = *pOptions;
+		programOptions.photoOptions = *pOptions;
 	}
 	else
 	{
 		return false;
 	}
 
-	executionCtrl.fileOptions = inputToFileOptions(inputOptions);
+	programOptions.fileOptions = inputToFileOptions(inputOptions);
 
 	if (inputOptions.count("time-resize")) {
-		executionCtrl.enableExecutionTime = true;
+		programOptions.enableExecutionTime = true;
 	}
 
 	return true;
@@ -167,9 +167,9 @@ static std::string usageStr =
 	"\theight or a percentage of the current size.\n"
 ;
 
-bool processCommandLine(int argc, char* argv[], ProgramOptions& executionCtrl)
+bool processCommandLine(int argc, char* argv[], ProgramOptions& programOptions)
 {
-	executionCtrl.progName = simplify_name(argv[0]);
+	programOptions.progName = simplify_name(argv[0]);
 
 	po::options_description options = addOptions();
 
@@ -179,7 +179,7 @@ bool processCommandLine(int argc, char* argv[], ProgramOptions& executionCtrl)
 
 	if (argc < MinArgCount)
 	{
-		std::cout << executionCtrl.progName << usageStr << "\n";
+		std::cout << programOptions.progName << usageStr << "\n";
 		std::cout << options << "\n";
 		return false;
 	}
@@ -189,9 +189,9 @@ bool processCommandLine(int argc, char* argv[], ProgramOptions& executionCtrl)
 		return false;
 	}
 
-	if (!InputToOptions(optionMemory, executionCtrl))
+	if (!InputToOptions(optionMemory, programOptions))
 	{
-		std::cout << executionCtrl.progName << usageStr << "\n";
+		std::cout << programOptions.progName << usageStr << "\n";
 		std::cout << options << "\n";
 		return false;
 	}

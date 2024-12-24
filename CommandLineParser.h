@@ -3,6 +3,6 @@
 
 #include "ProgramOptions.h"
 
-bool processCommandLine(int argc, char* argv[], ProgramOptions& executionCtrl);
+bool processCommandLine(int argc, char* argv[], ProgramOptions& programOptions);
 
 #endif // COMMAND_LINE_PARSER_H_
