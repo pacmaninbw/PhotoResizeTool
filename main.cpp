@@ -17,7 +17,6 @@ int main(int argc, char* argv[])
 		{
 			ProgramOptions programOptions = *progOptions;
 			PhotoFileList photoFiles = buildPhotoInputAndOutputList(programOptions.fileOptions);
-
 			UtilityTimer stopWatch;
 
 			std::size_t resizeCount = resizeAllPhotosInList(
