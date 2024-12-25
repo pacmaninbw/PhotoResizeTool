@@ -1,5 +1,4 @@
 #include "CommandLineParser.h"
-#include "ProgramOptions.h"
 #include <iostream>
 #include "PhotoFileList.h"
 #include "photofilefinder.h"
@@ -14,16 +13,15 @@ int main(int argc, char* argv[])
 
 	try
 	{
-		ProgramOptions programOptions;
-		std::size_t resizeCount = 0;
-
-		if (processCommandLine(argc, argv, programOptions))
+		if (const auto progOptions = parseCommandLine(argc, argv); progOptions.has_value())
 		{
+			ProgramOptions programOptions = *progOptions;
 			PhotoFileList photoFiles = buildPhotoInputAndOutputList(programOptions.fileOptions);
 
 			UtilityTimer stopWatch;
 
-			resizeCount = resizeAllPhotosInList(programOptions.photoOptions, photoFiles);
+			std::size_t resizeCount = resizeAllPhotosInList(
+				programOptions.photoOptions, photoFiles);
 			if (resizeCount != photoFiles.size())
 			{
 				std::cerr << "Not all photos were resized\n";
@@ -40,6 +38,13 @@ int main(int argc, char* argv[])
 			else
 			{
 				std::cout << report;
+			}
+		}
+		else
+		{
+			if (progOptions.error() != CommandLineStatus::HelpRequested)
+			{
+				executionStatus = EXIT_FAILURE;
 			}
 		}
 	}

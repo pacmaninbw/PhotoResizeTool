@@ -76,9 +76,9 @@ static cv::Mat resizeByUserSpecification(cv::Mat& photo, const PhotoOptions& pho
         return resizePhoto(photo, photoOptions.maxWdith, photoOptions.maxHeight);
     }
 
-    if (photoOptions.reductionToPercentage > 0)
+    if (photoOptions.scaleFactor > 0)
     {
-        return resizePhotoByPercentage(photo, photoOptions.reductionToPercentage);
+        return resizePhotoByPercentage(photo, photoOptions.scaleFactor);
     }
 
     if (photoOptions.maintainRatio)
@@ -110,7 +110,7 @@ static cv::Mat resizeByUserSpecification(cv::Mat& photo, const PhotoOptions& pho
     return photo;
 }
 
-static bool resizeAndSavePhoto(PhotoFile photoFile, const PhotoOptions& photoOptions)
+static bool resizeAndSavePhoto(const PhotoFile& photoFile, const PhotoOptions& photoOptions)
 {
     cv::Mat photo = cv::imread(photoFile.inputName);
     if (photo.empty()) {
@@ -120,7 +120,7 @@ static bool resizeAndSavePhoto(PhotoFile photoFile, const PhotoOptions& photoOpt
 
     cv::Mat resized = resizeByUserSpecification(photo, photoOptions);
 
-    if (photoOptions.displayImage)
+    if (photoOptions.displayResized)
     {
         cv::imshow("Resized Photo", resized);
         cv::waitKey(0);

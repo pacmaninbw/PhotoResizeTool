@@ -85,7 +85,7 @@ static InputPhotoList findAllPhotos(fs::path& originsDir, FileOptions& fileOptio
     return tempFileList;
 }
 
-static std::string changeNonAlphaNumCharsToUnderscore(const std::string& inName)
+static std::string makeFileNameWebSafe(const std::string& inName)
 {
     std::string webSafeName;
 
@@ -107,7 +107,7 @@ static std::string makeOutputFileName(
 
     if (fileOptions.fixFileName)
     {
-        outputFileName = changeNonAlphaNumCharsToUnderscore(outputFileName);
+        outputFileName = makeFileNameWebSafe(outputFileName);
     }
 
     if (!fileOptions.resizedPostfix.empty())
@@ -134,7 +134,7 @@ static std::string makeOutputFileName(
     return targetFile.string();
 }
 
-static PhotoFileList copyInFilesToPhotoListAddOutFileSpec(
+static PhotoFileList copyInFileNamesToPhotoListAddOutFileNames(
     FileOptions& fileOptions,
     InputPhotoList& inFileList,
     fs::path& targetDir
@@ -188,7 +188,7 @@ PhotoFileList buildPhotoInputAndOutputList(FileOptions& fileOptions)
     if (inputPhotoList.size())
     {
         fs::path targetDir = directories.find("TargetDir")->second;
-        photoFileList = copyInFilesToPhotoListAddOutFileSpec(
+        photoFileList = copyInFileNamesToPhotoListAddOutFileNames(
             fileOptions, inputPhotoList, targetDir);
     }
     else

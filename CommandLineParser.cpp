@@ -1,13 +1,12 @@
 #include <boost/program_options.hpp>
 #include "CommandLineParser.h"
-#include "ProgramOptions.h"
 #include <expected>
 #include <filesystem>
 #include <iostream>
 #include <string>
 #include <vector>
 
-static std::string simplify_name(char *path)
+static std::string simplifyName(char *path)
 {
 	return std::filesystem::path{path ? path : "PhotoResizeTool"}.filename().string();
 }
@@ -21,6 +20,13 @@ enum class PhotoOptionError
 	maintain_ration_no_size,
 	too_many_sizes,
 	no_size
+};
+
+enum class ProgramOptionStatus
+{
+	no_error,
+	photo_option_error,
+	file_opetion_error
 };
 
 static po::options_description addOptions()
@@ -46,7 +52,7 @@ static po::options_description addOptions()
 }
 
 
-static FileOptions inputToFileOptions(po::variables_map& inputOptions)
+static FileOptions processFileOptions(po::variables_map& inputOptions)
 {
 	FileOptions fileOptions;
 
@@ -78,7 +84,7 @@ static FileOptions inputToFileOptions(po::variables_map& inputOptions)
 	return fileOptions;
 }
 
-static PhotoOptionError maintainRatioCheck(po::variables_map& inputOptions)
+static PhotoOptionError checkRatioForErrors(po::variables_map& inputOptions)
 {
 	if (inputOptions.count("max-height") && inputOptions.count("max-width"))
 	{
@@ -101,12 +107,13 @@ static bool hasSize(po::variables_map& inputOptions)
 		inputOptions.count("percentage");
 }
 
-static auto inputToPhotoOptions(po::variables_map& inputOptions) -> std::expected<PhotoOptions, PhotoOptionError>
+static auto processPhotoOptions(po::variables_map& inputOptions) -> 
+	std::expected<PhotoOptions, PhotoOptionError>
 {
 	PhotoOptions photoCtrl;
 	
 	if (inputOptions.count("maintain-ratio")) {
-		PhotoOptionError ratioCheck = maintainRatioCheck(inputOptions);
+		PhotoOptionError ratioCheck = checkRatioForErrors(inputOptions);
 		if (ratioCheck != PhotoOptionError::no_error)
 		{
 			return std::unexpected(ratioCheck);
@@ -122,7 +129,7 @@ static auto inputToPhotoOptions(po::variables_map& inputOptions) -> std::expecte
 		photoCtrl.maxHeight = (inputOptions.count("max-height")) ?
 			inputOptions["max-height"].as<std::size_t>() : 0;
 
-		photoCtrl.reductionToPercentage = (inputOptions.count("percentage")) ?
+		photoCtrl.scaleFactor = (inputOptions.count("percentage")) ?
 			inputOptions["percentage"].as<unsigned int>() : 0;
 	}
 	else
@@ -133,30 +140,33 @@ static auto inputToPhotoOptions(po::variables_map& inputOptions) -> std::expecte
 
 	if (inputOptions.count("display-resized"))
 	{
-		photoCtrl.displayImage = true;
+		photoCtrl.displayResized = true;
 	}
 
 	return photoCtrl;
 }
 
-static bool InputToOptions(po::variables_map& inputOptions, ProgramOptions& programOptions)
+static auto processProgramOptions(po::variables_map& inputOptions) -> 
+	std::expected<ProgramOptions, ProgramOptionStatus>
 {
-	if (const auto pOptions = inputToPhotoOptions(inputOptions); pOptions.has_value())
+	ProgramOptions programOptions;
+
+	if (const auto pOptions = processPhotoOptions(inputOptions); pOptions.has_value())
 	{
 		programOptions.photoOptions = *pOptions;
 	}
 	else
 	{
-		return false;
+		return std::unexpected(ProgramOptionStatus::photo_option_error);
 	}
 
-	programOptions.fileOptions = inputToFileOptions(inputOptions);
+	programOptions.fileOptions = processFileOptions(inputOptions);
 
 	if (inputOptions.count("time-resize")) {
 		programOptions.enableExecutionTime = true;
 	}
 
-	return true;
+	return programOptions;
 }
 
 static const int MinArgCount = 2;
@@ -167,36 +177,44 @@ static std::string usageStr =
 	"\theight or a percentage of the current size.\n"
 ;
 
-bool processCommandLine(int argc, char* argv[], ProgramOptions& programOptions)
+auto parseCommandLine(int argc, char* argv[]) -> 
+	std::expected<ProgramOptions, CommandLineStatus>
 {
-	programOptions.progName = simplify_name(argv[0]);
+	ProgramOptions programOptions;
+
+	std::string progName = simplifyName(argv[0]);
 
 	po::options_description options = addOptions();
+
+	if (argc < MinArgCount)
+	{
+		std::cout << progName << usageStr << "\n";
+		std::cout << options << "\n";
+		return std::unexpected(CommandLineStatus::HasErrors);
+	}
 
 	po::variables_map optionMemory;        
 	po::store(po::parse_command_line(argc, argv, options), optionMemory);
 	po::notify(optionMemory);    
 
-	if (argc < MinArgCount)
-	{
-		std::cout << programOptions.progName << usageStr << "\n";
-		std::cout << options << "\n";
-		return false;
-	}
-
 	if (optionMemory.count("help")) {
 		std::cout << options << "\n";
-		return false;
+		return std::unexpected(CommandLineStatus::HelpRequested);
 	}
 
-	if (!InputToOptions(optionMemory, programOptions))
+	if (const auto progOptions = processProgramOptions(optionMemory); progOptions.has_value())
 	{
-		std::cout << programOptions.progName << usageStr << "\n";
+		programOptions = *progOptions;
+		programOptions.progName = progName;
+	}
+	else
+	{
+		std::cout << progName << usageStr << "\n";
 		std::cout << options << "\n";
-		return false;
+		return std::unexpected(CommandLineStatus::HasErrors);
 	}
 
-    return true;
+	return programOptions;
 }
 
 
