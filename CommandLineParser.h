@@ -16,7 +16,7 @@ struct ProgramOptions
 
 enum class CommandLineStatus
 {
-    NoErros,
+    NoErrors,
     HelpRequested,
     HasErrors
 };

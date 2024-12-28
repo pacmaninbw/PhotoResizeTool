@@ -1,4 +1,5 @@
 #include <boost/program_options.hpp>
+#include <cctype>
 #include "CommandLineParser.h"
 #include <expected>
 #include <filesystem>
@@ -13,20 +14,27 @@ static std::string simplifyName(char *path)
 
 namespace po = boost::program_options;
 
+enum class FileOptionStatus
+{
+	NoErrors,
+	MissingArgument
+};
+
 enum class PhotoOptionError
 {
-	no_error,
-	maintain_ratio_both_specified,
-	maintain_ration_no_size,
-	too_many_sizes,
-	no_size
+	NoErrors,
+	MaintainRatioBothSpecified,
+	MaintainRatioNoSize,
+	MissingArgument,
+	TooManySizes,
+	NoSize
 };
 
 enum class ProgramOptionStatus
 {
-	no_error,
-	photo_option_error,
-	file_opetion_error
+	NoErrors,
+	HasPhotoOptionError,
+	HasFileOptionError
 };
 
 static po::options_description addOptions()
@@ -51,10 +59,96 @@ static po::options_description addOptions()
 	return options;
 }
 
+/*
+ * hasArgument is a workaround for the fact that the boost::program_options
+ * doesn't or can't check to see if the string following an option is another
+ * option. Note, this only works on a Unix or Linux system where switches are
+ * preceeded by dashes, Windows may require '/'.
+ * 
+ * Possible bug, it checks for alnum rather than if not dash.
+ */
+static bool hasArgument(const std::string& argument, const std::string& option)
+{
+	po::options_description options = addOptions();
+	const po::option_description* isSwitch = nullptr;
 
-static FileOptions processFileOptions(po::variables_map& inputOptions)
+	if (argument[0] == '-')
+	{
+		/*
+		 * Remove any preceeding '-', boost::program_options does not store
+		 * the preceeding dashes.
+		 */
+		auto notDashStart = std::find_if(argument.begin(), argument.end(),
+			(int(*)(int))std::isalnum);
+		if (notDashStart != argument.end())
+		{
+			std::string testArg(notDashStart, argument.end());
+			isSwitch = options.find_nothrow(testArg, true);
+		}
+	}
+
+	if (isSwitch != nullptr)
+	{
+		std::cerr << "The option " << option << " is missing the required argument!\n";
+		return false;
+	}
+
+	return true;
+}
+
+static FileOptionStatus checkMissingArguments(po::variables_map& inputOptions, FileOptions& fileOptions)
+{
+	FileOptionStatus returnStatus = FileOptionStatus::NoErrors;
+
+	if (inputOptions.count("save-dir")) {
+		std::string argument(inputOptions["save-dir"].as<std::string>());
+		if (hasArgument(argument, "--save-dir"))
+		{
+			fileOptions.targetDirectory = argument;
+		}
+		else
+		{
+			returnStatus = FileOptionStatus::MissingArgument;
+		}
+	}
+
+	if (inputOptions.count("source-dir")) {
+		std::string argument(inputOptions["source-dir"].as<std::string>());
+		if (hasArgument(argument, "--source-dir"))
+		{
+			fileOptions.sourceDirectory = argument;
+		}
+		else
+		{
+			returnStatus = FileOptionStatus::MissingArgument;
+		}
+	}
+
+	if (inputOptions.count("extend-filename")) {
+		std::string argument(inputOptions["extend-filename"].as<std::string>());
+		if (hasArgument(argument, "--extend-filename"))
+		{
+			fileOptions.resizedPostfix = argument;
+		}
+		else
+		{
+			returnStatus = FileOptionStatus::MissingArgument;
+		}
+	}
+
+	return returnStatus;
+}
+
+static auto processFileOptions(po::variables_map& inputOptions) -> 
+	std::expected<FileOptions, FileOptionStatus>
 {
 	FileOptions fileOptions;
+
+	FileOptionStatus hasArguments = checkMissingArguments(inputOptions, fileOptions);
+	if (hasArguments != FileOptionStatus::NoErrors)
+	{
+		return std::unexpected(hasArguments);
+	}
 
 	if (inputOptions.count("all-jpg-files")) 
 	{
@@ -63,18 +157,6 @@ static FileOptions processFileOptions(po::variables_map& inputOptions)
 
 	if (inputOptions.count("all-png-files")) {
 		fileOptions.processPNGFiles = true;
-	}
-
-	if (inputOptions.count("save-dir")) {
-		fileOptions.targetDirectory = inputOptions["save-dir"].as<std::string>();
-	}
-
-	if (inputOptions.count("source-dir")) {
-		fileOptions.sourceDirectory = inputOptions["source-dir"].as<std::string>();
-	}
-
-	if (inputOptions.count("extend-filename")) {
-		fileOptions.resizedPostfix = inputOptions["extend-filename"].as<std::string>();
 	}
 
 	if (inputOptions.count("web-safe-name")) {
@@ -89,16 +171,16 @@ static PhotoOptionError checkRatioForErrors(po::variables_map& inputOptions)
 	if (inputOptions.count("max-height") && inputOptions.count("max-width"))
 	{
 		std::cerr << "Only one of --max-width or --max-height can be specified with maintain-ratio\n";
-		return PhotoOptionError::maintain_ratio_both_specified;
+		return PhotoOptionError::MaintainRatioBothSpecified;
 	}
 
 	if (!inputOptions.count("max-height") && !inputOptions.count("max-width"))
 	{
 		std::cerr << "A maximum size, either width or height must be specified with maintain-ratio\n";
-		return PhotoOptionError::maintain_ration_no_size;
+		return PhotoOptionError::MaintainRatioNoSize;
 	}
 
-	return PhotoOptionError::no_error;
+	return PhotoOptionError::NoErrors;
 }
 
 static bool hasSize(po::variables_map& inputOptions)
@@ -114,7 +196,7 @@ static auto processPhotoOptions(po::variables_map& inputOptions) ->
 	
 	if (inputOptions.count("maintain-ratio")) {
 		PhotoOptionError ratioCheck = checkRatioForErrors(inputOptions);
-		if (ratioCheck != PhotoOptionError::no_error)
+		if (ratioCheck != PhotoOptionError::NoErrors)
 		{
 			return std::unexpected(ratioCheck);
 		}
@@ -135,7 +217,7 @@ static auto processPhotoOptions(po::variables_map& inputOptions) ->
 	else
 	{
 		std::cerr << "A new size must be specified using --percentage, --max-width or --max-height\n";
-		return std::unexpected(PhotoOptionError::no_size);
+		return std::unexpected(PhotoOptionError::NoSize);
 	}
 
 	if (inputOptions.count("display-resized"))
@@ -146,10 +228,12 @@ static auto processPhotoOptions(po::variables_map& inputOptions) ->
 	return photoCtrl;
 }
 
-static auto processProgramOptions(po::variables_map& inputOptions) -> 
-	std::expected<ProgramOptions, ProgramOptionStatus>
+static auto processProgramOptions(po::variables_map& inputOptions,
+	const std::string& progName) -> std::expected<ProgramOptions, ProgramOptionStatus>
 {
 	ProgramOptions programOptions;
+
+	programOptions.progName = progName;
 
 	if (const auto pOptions = processPhotoOptions(inputOptions); pOptions.has_value())
 	{
@@ -157,10 +241,17 @@ static auto processProgramOptions(po::variables_map& inputOptions) ->
 	}
 	else
 	{
-		return std::unexpected(ProgramOptionStatus::photo_option_error);
+		return std::unexpected(ProgramOptionStatus::HasPhotoOptionError);
 	}
 
-	programOptions.fileOptions = processFileOptions(inputOptions);
+	if (const auto fOptions = processFileOptions(inputOptions); fOptions.has_value())
+	{
+		programOptions.fileOptions = *fOptions;
+	}
+	else
+	{
+		return std::unexpected(ProgramOptionStatus::HasFileOptionError);
+	}
 
 	if (inputOptions.count("time-resize")) {
 		programOptions.enableExecutionTime = true;
@@ -177,41 +268,64 @@ static std::string usageStr =
 	"\theight or a percentage of the current size.\n"
 ;
 
+static CommandLineStatus usage(const std::string& progName,
+	const po::options_description& options,
+	const std::string errorMessage
+	)
+{
+	if (errorMessage.length())
+	{
+		std::cerr << errorMessage << "\n";
+	}
+	std::cerr << progName << usageStr << "\n" << options << "\n";
+	return CommandLineStatus::HasErrors;
+}
+
+static CommandLineStatus help(const std::string& progName,
+	const po::options_description& options)
+{
+	std::cout << progName << options << "\n";
+	return CommandLineStatus::HelpRequested;
+}
+
 auto parseCommandLine(int argc, char* argv[]) -> 
 	std::expected<ProgramOptions, CommandLineStatus>
 {
 	ProgramOptions programOptions;
-
 	std::string progName = simplifyName(argv[0]);
-
 	po::options_description options = addOptions();
 
 	if (argc < MinArgCount)
 	{
-		std::cout << progName << usageStr << "\n";
-		std::cout << options << "\n";
-		return std::unexpected(CommandLineStatus::HasErrors);
+		return std::unexpected(usage(progName, options,
+			"Missing the required new size for the resized photos."));
 	}
 
 	po::variables_map optionMemory;        
-	po::store(po::parse_command_line(argc, argv, options), optionMemory);
-	po::notify(optionMemory);    
-
+	try
+	{
+		po::store(po::parse_command_line(argc, argv, options), optionMemory);
+		po::notify(optionMemory);    
+	}
+	/*
+	 * Handle any exceptions thrown by boost::program_options.
+	 */
+	catch(const std::exception& e)
+	{
+		return std::unexpected(usage(progName, options, e.what()));
+	}
+	
 	if (optionMemory.count("help")) {
-		std::cout << options << "\n";
-		return std::unexpected(CommandLineStatus::HelpRequested);
+		return std::unexpected(help(progName, options));
 	}
 
-	if (const auto progOptions = processProgramOptions(optionMemory); progOptions.has_value())
+	if (const auto progOptions = processProgramOptions(optionMemory, progName); progOptions.has_value())
 	{
 		programOptions = *progOptions;
-		programOptions.progName = progName;
 	}
 	else
 	{
-		std::cout << progName << usageStr << "\n";
-		std::cout << options << "\n";
-		return std::unexpected(CommandLineStatus::HasErrors);
+		return std::unexpected(usage(progName, options, ""));
 	}
 
 	return programOptions;
