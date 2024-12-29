@@ -81,11 +81,11 @@ static ArgCheck hasArgument(po::variables_map& inputOptions, const std::string& 
 		 * Remove any preceeding optionStarter, boost::program_options does not store
 		 * the option start.
 		 */
-		auto notOptionStart = std::find_if_not(argument.begin(), argument.end(),
+		auto startOptionText = std::find_if_not(argument.begin(), argument.end(),
 			[](char c) { return c == optionStarter; });
-		if (notOptionStart != argument.end())
+		if (startOptionText != argument.end())
 		{
-			if (options.find_nothrow(std::string(notOptionStart, argument.end()), true))
+			if (options.find_nothrow(std::string(startOptionText, argument.end()), true))
 			{
 				std::cerr << "The option " << option << " is missing the required argument!\n";
 				argument.clear();
