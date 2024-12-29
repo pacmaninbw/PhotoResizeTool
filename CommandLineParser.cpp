@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <boost/program_options.hpp>
-#include <cctype>
 #include "CommandLineParser.h"
 #include <expected>
 #include <filesystem>
