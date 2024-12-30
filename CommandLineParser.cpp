@@ -101,28 +101,31 @@ static ArgCheck hasArgument(po::variables_map& inputOptions, const std::string& 
 static auto processFileOptions(po::variables_map& inputOptions) -> 
 	std::expected<FileOptions, ProgOptStatus>
 {
-	FileOptions fileOptions;
-
+	std::vector<std::string> optionsForArgCheck = {"save-dir", "source-dir", "extend-filename"};
+	std::vector<ArgCheck> argChecks;
 	ProgOptStatus hasArguments = ProgOptStatus::NoErrors;
-
-	ArgCheck argCheck = hasArgument(inputOptions, "save-dir");
-	fileOptions.targetDirectory = argCheck.validArgument;
-	hasArguments = argCheck.argStatus;
-
-	argCheck = hasArgument(inputOptions, "source-dir");
-	fileOptions.sourceDirectory = argCheck.validArgument;
-	hasArguments = (hasArguments == ProgOptStatus::NoErrors)?
-		argCheck.argStatus : hasArguments;
-
-	argCheck = hasArgument(inputOptions, "extend-filename");
-	fileOptions.resizedPostfix = argCheck.validArgument;
-	hasArguments = (hasArguments == ProgOptStatus::NoErrors)?
-		argCheck.argStatus : hasArguments;
-
+	constexpr std::size_t targetDirI = 0;
+	constexpr std::size_t srcDirI = 1;
+	constexpr std::size_t resizedPostfixI = 2;
+	
+	// Process as many options as possible.
+	for (auto optionToCheck: optionsForArgCheck)
+	{
+		ArgCheck argCheck = hasArgument(inputOptions, optionToCheck);
+		argChecks.push_back(argCheck);
+		hasArguments = (hasArguments == ProgOptStatus::NoErrors)?
+			argCheck.argStatus : hasArguments;
+	}
+	
 	if (hasArguments != ProgOptStatus::NoErrors)
 	{
 		return std::unexpected(hasArguments);
 	}
+
+	FileOptions fileOptions;
+	fileOptions.targetDirectory = argChecks[targetDirI].validArgument;
+	fileOptions.sourceDirectory = argChecks[srcDirI].validArgument;
+	fileOptions.resizedPostfix = argChecks[resizedPostfixI].validArgument;
 
 	if (inputOptions.count("all-jpg-files")) 
 	{
