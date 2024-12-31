@@ -36,10 +36,13 @@ static po::options_description addOptions()
 		("max-width", po::value<std::size_t>(), "The maximum width of the resized photo")
 		("max-height", po::value<std::size_t>(), "The maximum height of the resized photo")
 		("maintain-ratio", "Maintain the current ratio of width to height")
-		("percentage", po::value<unsigned int>(), "The new size of the photo as a percentage of the old size")
+		("scale-factor", po::value<unsigned int>(),
+			"The new size of the photo as a percentage of the old size")
 		("source-dir", po::value<std::string>(), "Where to find the original photos")
 		("save-dir", po::value<std::string>(), "Where to save the resized photos")
-		("extend-filename", po::value<std::string>(), "Add the specified string to the resized photo")
+		("extend-filename", po::value<std::string>(),
+			"Add the specified string to the resized photo")
+		("overwrite", "Overwrite existing output files")
 		("web-safe-name", "Change all non alpha numeric characters in filename to underscore")
 		("all-jpg-files", "Process all the JPEG format photos")
 		("all-png-files", "Process all the PNG format photos")
@@ -50,28 +53,21 @@ static po::options_description addOptions()
 	return options;
 }
 
-struct ArgCheck
-{
-	std::string validArgument;
-	ProgOptStatus argStatus;
-};
-
 /*
  * hasArgument is a workaround for the fact that the boost::program_options
  * doesn't or can't check to see if the string following an option is another
  * option. 
  */
-static ArgCheck hasArgument(po::variables_map& inputOptions, const std::string& option)
+static auto hasArgument(po::variables_map& inputOptions, const std::string& option) -> 
+	std::expected<std::string, ProgOptStatus>
 {
-	ArgCheck argCheck;
-	argCheck.argStatus = ProgOptStatus::NoErrors;
-
+	std::string argument("");
 	if (!inputOptions.count(option))
 	{
-		return argCheck;	// No argument to check
+		return argument;	// No argument to check
 	}
 
-	std::string argument(inputOptions[option].as<std::string>());
+	argument = inputOptions[option].as<std::string>();
 	po::options_description options = addOptions();
 
 	if (argument[0] == optionStarter)
@@ -87,45 +83,66 @@ static ArgCheck hasArgument(po::variables_map& inputOptions, const std::string& 
 			if (options.find_nothrow(std::string(startOptionText, argument.end()), true))
 			{
 				std::cerr << "The option " << option << " is missing the required argument!\n";
-				argument.clear();
-				argCheck.argStatus = ProgOptStatus::MissingArgument;
+				return std::unexpected(ProgOptStatus::MissingArgument);
 			}
 		}
 	}
 
-	argCheck.validArgument = argument;
-	
-	return argCheck;
+	return argument;
 }
 
-static auto processFileOptions(po::variables_map& inputOptions) -> 
+static auto checkFileOptionsWithArguments(po::variables_map& inputOptions) -> 
 	std::expected<FileOptions, ProgOptStatus>
 {
+	FileOptions fileOptions;
 	std::vector<std::string> optionsForArgCheck = {"save-dir", "source-dir", "extend-filename"};
-	std::vector<ArgCheck> argChecks;
+	std::vector<std::string *> fileOptionValues = 
+	{
+		{&fileOptions.targetDirectory},
+		{&fileOptions.sourceDirectory},
+		{&fileOptions.resizedPostfix}
+	};
 	ProgOptStatus hasArguments = ProgOptStatus::NoErrors;
-	constexpr std::size_t targetDirI = 0;
-	constexpr std::size_t srcDirI = 1;
-	constexpr std::size_t resizedPostfixI = 2;
 	
 	// Process as many options as possible.
+	std::size_t i = 0;
 	for (auto optionToCheck: optionsForArgCheck)
 	{
-		ArgCheck argCheck = hasArgument(inputOptions, optionToCheck);
-		argChecks.push_back(argCheck);
-		hasArguments = (hasArguments == ProgOptStatus::NoErrors)?
-			argCheck.argStatus : hasArguments;
+		const auto argCheck = hasArgument(inputOptions, optionToCheck);
+		if (argCheck.has_value())
+		{
+			*fileOptionValues[i] = *argCheck;
+		}
+		else
+		{
+			hasArguments = (hasArguments == ProgOptStatus::NoErrors)?
+				argCheck.error() : hasArguments;
+		}
+		++i;
 	}
-	
+
 	if (hasArguments != ProgOptStatus::NoErrors)
 	{
 		return std::unexpected(hasArguments);
 	}
 
+	return fileOptions;
+}
+
+static auto processFileOptions(po::variables_map& inputOptions) -> 
+	std::expected<FileOptions, ProgOptStatus>
+{
 	FileOptions fileOptions;
-	fileOptions.targetDirectory = argChecks[targetDirI].validArgument;
-	fileOptions.sourceDirectory = argChecks[srcDirI].validArgument;
-	fileOptions.resizedPostfix = argChecks[resizedPostfixI].validArgument;
+
+	const auto argCheck = checkFileOptionsWithArguments(inputOptions);
+	if (argCheck.has_value())
+	{
+		fileOptions = *argCheck;
+	}
+	else
+	{
+		return std::unexpected(argCheck.error());
+	}
 
 	if (inputOptions.count("all-jpg-files")) 
 	{
@@ -138,6 +155,11 @@ static auto processFileOptions(po::variables_map& inputOptions) ->
 
 	if (inputOptions.count("web-safe-name")) {
 		fileOptions.fixFileName = true;
+	}
+
+	if (inputOptions.count("overwrite"))
+	{
+		fileOptions.overWriteFiles = true;
 	}
 
 	return fileOptions;
@@ -163,7 +185,7 @@ static ProgOptStatus checkRatioForErrors(po::variables_map& inputOptions)
 static bool hasSize(po::variables_map& inputOptions)
 {
 	return inputOptions.count("max-height") || inputOptions.count("max-width") ||
-		inputOptions.count("percentage");
+		inputOptions.count("scale-factor");
 }
 
 static auto processPhotoOptions(po::variables_map& inputOptions) -> 
@@ -188,8 +210,8 @@ static auto processPhotoOptions(po::variables_map& inputOptions) ->
 		photoCtrl.maxHeight = (inputOptions.count("max-height")) ?
 			inputOptions["max-height"].as<std::size_t>() : 0;
 
-		photoCtrl.scaleFactor = (inputOptions.count("percentage")) ?
-			inputOptions["percentage"].as<unsigned int>() : 0;
+		photoCtrl.scaleFactor = (inputOptions.count("scale-factor")) ?
+			inputOptions["scale-factor"].as<unsigned int>() : 0;
 	}
 	else
 	{
