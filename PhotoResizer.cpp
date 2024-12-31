@@ -112,6 +112,12 @@ static cv::Mat resizeByUserSpecification(cv::Mat& photo, const PhotoOptions& pho
 
 static bool resizeAndSavePhoto(const PhotoFile& photoFile, const PhotoOptions& photoOptions)
 {
+    // Possibly file already exists and user did not specify --overwrite
+    if (photoFile.outputName.empty())
+    {
+        return false;
+    }
+
     cv::Mat photo = cv::imread(photoFile.inputName);
     if (photo.empty()) {
         std::cerr << "Could not read photo " << photoFile.inputName << "!\n";

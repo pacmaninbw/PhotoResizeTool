@@ -8,6 +8,7 @@ struct FileOptions
     bool fixFileName = false;
     bool processJPGFiles = true;
     bool processPNGFiles = false;
+    bool overWriteFiles = false;
     std::string sourceDirectory;
     std::string targetDirectory;
 	std::string relocDirectory;

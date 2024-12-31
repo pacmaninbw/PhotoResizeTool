@@ -120,15 +120,10 @@ static std::string makeOutputFileName(
     fs::path targetFile = targetDir;
     targetFile.append(outputFileName);
 
-    if (fs::exists(targetFile))
+    if (fs::exists(targetFile) && !fileOptions.overWriteFiles)
     {
-        std::cerr << "Do you want to replace the photo: " << targetFile.string() << "?\n(y | n)>>\n";
-        std::string response;
-        std::cin >> response;
-        if (response == "n")
-        {
-            targetFile.clear();
-        }
+        std::cerr << "Attempting to overwrite existing file: " << targetFile << ". Use \'--overwrite\' to overwrite files.\n";
+        targetFile.clear();
     }
 
     return targetFile.string();
@@ -147,22 +142,7 @@ static PhotoFileList copyInFileNamesToPhotoListAddOutFileNames(
         PhotoFile currentPhoto;
         currentPhoto.inputName = file.string();
         currentPhoto.outputName = makeOutputFileName(file, targetDir, fileOptions);
-        if (currentPhoto.outputName.empty())
-        {
-            // If there was a replacement that the user replied no to, do they want to quit?
-            std::cerr << "Do you want to quit?(y / n)\n";
-            std::string response;
-            std::cin >> response;
-            if (response == "y")
-            {
-                photoFileList.clear();
-                return photoFileList;
-            }
-        }
-        else
-        {
-            photoFileList.push_back(currentPhoto);
-        }
+        photoFileList.push_back(currentPhoto);
     }
 
     return photoFileList;
