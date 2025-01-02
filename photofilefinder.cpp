@@ -122,7 +122,7 @@ static std::string makeOutputFileName(
 
     if (fs::exists(targetFile) && !fileOptions.overWriteFiles)
     {
-        std::cerr << "Attempting to overwrite existing file: " << targetFile << ". Use \'--overwrite\' to overwrite files.\n";
+        std::cerr << "Warning: Attempting to overwrite existing file: " << targetFile << ". Use \'--overwrite\' to overwrite files.\n";
         targetFile.clear();
     }
 
