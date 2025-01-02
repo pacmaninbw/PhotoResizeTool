@@ -82,7 +82,7 @@ static auto hasArgument(po::variables_map& inputOptions, const std::string& opti
 		{
 			if (options.find_nothrow(std::string(startOptionText, argument.end()), true))
 			{
-				std::cerr << "The option " << option << " is missing the required argument!\n";
+				std::cerr << "The option \'--" << option << "\' is missing the required argument!\n";
 				return std::unexpected(ProgOptStatus::MissingArgument);
 			}
 		}
@@ -91,34 +91,37 @@ static auto hasArgument(po::variables_map& inputOptions, const std::string& opti
 	return argument;
 }
 
+struct FileOptionValuePair
+{
+	std::string option;
+	std::string *value;
+};
+
 static auto checkFileOptionsWithArguments(po::variables_map& inputOptions) -> 
 	std::expected<FileOptions, ProgOptStatus>
 {
 	FileOptions fileOptions;
-	std::vector<std::string> optionsForArgCheck = {"save-dir", "source-dir", "extend-filename"};
-	std::vector<std::string *> fileOptionValues = 
+	std::vector<FileOptionValuePair> optionsAndValuesForArgCheck = 
 	{
-		{&fileOptions.targetDirectory},
-		{&fileOptions.sourceDirectory},
-		{&fileOptions.resizedPostfix}
+		{"save-dir", &fileOptions.targetDirectory},
+		{"source-dir", &fileOptions.sourceDirectory},
+		{"extend-filename", &fileOptions.resizedPostfix}
 	};
 	ProgOptStatus hasArguments = ProgOptStatus::NoErrors;
 	
 	// Process as many options as possible.
-	std::size_t i = 0;
-	for (auto optionToCheck: optionsForArgCheck)
+	for (auto optionToCheck: optionsAndValuesForArgCheck)
 	{
-		const auto argCheck = hasArgument(inputOptions, optionToCheck);
+		const auto argCheck = hasArgument(inputOptions, optionToCheck.option);
 		if (argCheck.has_value())
 		{
-			*fileOptionValues[i] = *argCheck;
+			*optionToCheck.value = *argCheck;
 		}
 		else
 		{
 			hasArguments = (hasArguments == ProgOptStatus::NoErrors)?
 				argCheck.error() : hasArguments;
 		}
-		++i;
 	}
 
 	if (hasArguments != ProgOptStatus::NoErrors)
@@ -275,8 +278,12 @@ static CommandLineStatus usage(const std::string& progName,
 	if (errorMessage.length())
 	{
 		std::cerr << errorMessage << "\n";
+		std::cerr << progName << usageStr << "\n" << options << "\n";
 	}
-	std::cerr << progName << usageStr << "\n" << options << "\n";
+	else
+	{
+		std::cerr << progName << ":\n" << options << "\n";
+	}
 	return CommandLineStatus::HasErrors;
 }
 
