@@ -48,7 +48,7 @@ static DirectoryMap findAllDirectories(FileOptions& fileOptions)
     defaultDir = dirMap.find("SourceDir")->second;
 
     findDirectory(fileOptions.targetDirectory, "photo target", defaultDir, "TargetDir", dirMap);
-    findDirectory(fileOptions.relocDirectory, "photo target", defaultDir, "RelocDir", dirMap);
+    findDirectory(fileOptions.relocDirectory, "photo relocation", defaultDir, "RelocDir", dirMap);
 
     return dirMap;
 }
