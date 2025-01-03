@@ -65,5 +65,8 @@ TestTableMap
 *.gcno
 *Out.txt
 *.jpg
+
+# Stackexchange Code Review Questions
 quest*.txt
+CodeReview
 
