@@ -18,37 +18,53 @@ using DirectoryMap = std::unordered_map<std::string, fs::path>;
 
 using InputPhotoList = std::vector<fs::path>;
 
-static void findDirectory(std::string& target, const std::string& errString, 
-     fs::path& defaultDir, const std::string& dirIndex, DirectoryMap& dirMap
-)
+struct FindDirectoryData
+{
+    const std::string errString;
+    const std::string mapIndex;
+    const std::string target;
+};
+
+static fs::path findDirectory(const FindDirectoryData& fDD, fs::path& defaultDir)
 {
     fs::path foundDir  = defaultDir;
 
-    if (!target.empty())
+    if (!fDD.target.empty())
     {
         foundDir = fs::current_path();
-        foundDir.append(target);
+        foundDir.append(fDD.target);
         if (!fs::exists(foundDir))
         {
-            std::cerr << "The " << errString << " directory " << target << 
+            std::cerr << "The " << fDD.errString << " directory " << foundDir.string() << 
                 " can't be found!\n";
             foundDir.clear();
         }
     }
 
-    dirMap.insert({dirIndex, foundDir});
+    return foundDir;
 }
 
 static DirectoryMap findAllDirectories(FileOptions& fileOptions)
 {
     DirectoryMap dirMap;
+    std::vector<FindDirectoryData> findDirectoryData =
+    {
+        {"photo source", "SourceDir", fileOptions.sourceDirectory},
+        {"photo target", "TargetDir", fileOptions.targetDirectory},
+        {"photo relocation", "RelocDir", fileOptions.relocDirectory}
+    };
+
     fs::path defaultDir = fs::current_path();
     
-    findDirectory(fileOptions.sourceDirectory, "photo source", defaultDir, "SourceDir", dirMap);
-    defaultDir = dirMap.find("SourceDir")->second;
-
-    findDirectory(fileOptions.targetDirectory, "photo target", defaultDir, "TargetDir", dirMap);
-    findDirectory(fileOptions.relocDirectory, "photo relocation", defaultDir, "RelocDir", dirMap);
+    for (auto fDDi: findDirectoryData)
+    {
+        fs::path foundDir = findDirectory(fDDi, defaultDir);
+        dirMap.insert({fDDi.mapIndex, foundDir});
+        if (fDDi.mapIndex == "SourceDir")
+        {
+            defaultDir = foundDir;
+        }
+    }
 
     return dirMap;
 }
